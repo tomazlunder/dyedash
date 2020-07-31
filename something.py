@@ -5,6 +5,7 @@ from scrape_wiki import getBuyHistory
 from scrape_wiki import getSellHistory
 import json
 from pandas import DataFrame
+import pandas
 import datetime
 from datetime import date
 
@@ -55,6 +56,7 @@ def drawGantt():
     return fig
 
 def goldFromInteger(a):
+    #print(a)
     strmoney = "%08d"%a
     copper = strmoney[-2:]
     silver = strmoney[-4:-2]
@@ -77,7 +79,7 @@ def drawPriceChart(id):
     sellJSON = json.loads(sellDataFile)
     sellRes = sellJSON["results"]
 
-    print(buyRes)
+    #print(buyRes)
     fig = px.line(buyRes, x='listing_datetime', y='unit_price')
     fig.update_xaxes(rangeslider_visible=True)
 
@@ -89,11 +91,11 @@ def test():
 
     cursor.execute("SELECT * FROM Kit")
     a = cursor.fetchall()
-    print(a)
+    #print(a)
 
     cursor.execute("SELECT * FROM Blc WHERE id = 6")
     a = cursor.fetchall()
-    print(a)
+    #print(a)
 
     conn.close()
 
@@ -101,19 +103,30 @@ def getInOrderOfLastAvailabe():
     conn = sqlite3.connect('dyes.db')
     cursor = conn.cursor()
 
-    str = """SELECT Kit.id,Kit.name,sub.maxDateTo  FROM Kit LEFT JOIN (
+    query = """SELECT Kit.id,Kit.name,sub.maxDateTo  FROM Kit LEFT JOIN (
         SELECT id,MAX(date_from) as maxDateFrom,MAX(date_to) as maxDateTo FROM Blc GROUP BY id ORDER BY maxDateTo DESC) as sub
         ON Kit.id = sub.id
         WHERE Kit.id NOT IN (SELECT Curr.id FROM Curr)
         ORDER BY sub.maxDateTo DESC"""
-    print(str)
+    #print(query)
 
-    cursor.execute(str)
+    cursor.execute(query)
     df = DataFrame(cursor.fetchall())
     df.columns = ["id","name", "maxDateTo"]
 
+    query = """SELECT Kit.id, Kit.name FROM Curr LEFT JOIN Kit ON Kit.id = Curr.id"""
+    cursor.execute(query)
+    df2 = DataFrame(cursor.fetchall())
+    df2.columns = ["id","name"]
+
+    today = date.today()
+    maxDateTo = []
+    for i in range(len(df2)):
+        maxDateTo.append(str(today))
+    df2.insert(2, "maxDateTo", maxDateTo, True)
+
     conn.close()
-    return df
+    return pandas.concat([df2,df])
 
 def addStats(df):
     conn = sqlite3.connect('dyes.db')
@@ -127,7 +140,8 @@ def addStats(df):
         # Days since
         str = df.iloc[i]["maxDateTo"]
         if (str is None):
-            daySinceColumn.append(999)
+            #daySinceColumn.append(999)
+            daySinceColumn.append("NA")
             lastTimeUnavailable.append("NA")
             continue
         then = datetime.datetime.strptime(str, "%Y-%m-%d").date()
@@ -136,11 +150,11 @@ def addStats(df):
 
         # Last time period unavailable
 
-        print(df.iloc[i]["id"])
+        #print(df.iloc[i]["id"])
         str = "SELECT date_from, date_to from Blc WHERE id=%s ORDER BY date_to DESC"%df.iloc[i]["id"]
         cursor.execute(str)
         a = cursor.fetchall()
-        print(a)
+        #print(a)
 
         if a is None or len(a) < 2:
             lastTimeUnavailable.append("NA")
@@ -166,7 +180,7 @@ def addStats(df):
 
         # Mean time unavailable
 
-    print(lastTimeUnavailable)
+    #print(lastTimeUnavailable)
 
     df.insert(3, "Days since", daySinceColumn, True)
     df.insert(4, "Last time away", lastTimeUnavailable, True)

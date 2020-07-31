@@ -22,15 +22,13 @@ def neverInBlc():
     a = cursor.fetchall()
     #print(a)
 
-    array = []
-
-    return
+    return a
 
 def ganttData():
     conn = sqlite3.connect('dyes.db')
     cursor = conn.cursor()
 
-    cursor.execute("""SELECT Blc.id,Kit.name,Blc.date_from,Blc.date_to FROM Blc
+    cursor.execute("""SELECT Kit.id,Kit.name,Blc.date_from,Blc.date_to FROM Blc
                       LEFT JOIN Kit
                       ON Blc.id = Kit.id;
     """)
@@ -64,5 +62,25 @@ def ganttData():
         element = dict(Task=name, Start=start, Finish=end, Resource=name)
         listOfDicts.append(element)
 
-
     return listOfDicts
+
+def access(id):
+    conn = sqlite3.connect('dyes.db')
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT * FROM Access WHERE id = \'%s\'"%id)
+
+    acc = cursor.fetchall()
+
+    print(acc)
+
+    if(len(acc) == 0):
+        cursor.execute("INSERT INTO Access VALUES (\'%s\', 1)"%id)
+        conn.commit()
+        return
+    else:
+        num = acc[0][1];
+        print(num);
+        cursor.execute("UPDATE Access SET counter = \'%s\' WHERE id =\'%s\'"%(num+1,id))
+        conn.commit()
+        return

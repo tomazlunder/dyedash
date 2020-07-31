@@ -47,4 +47,10 @@ cursor.execute("""CREATE TABLE Curr (
                    UNIQUE(id,date_from)
                    )""")
 
+#cursor.execute("""CREATE TABLE Access(
+#                    id text,
+#                    counter integer,
+#                    UNIQUE(id)
+#                    )""")
+
 print("Database created!")
