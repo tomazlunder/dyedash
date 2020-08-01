@@ -1,34 +1,42 @@
+#Dash and flask
 import dash
 import dash_core_components as dcc
 import dash_html_components as html
-import dash_table
 import dash_bootstrap_components as dbc
 
 from dash.dependencies import Output
 from dash.dependencies import Input
 from dash.dependencies import State
 
-from datetime import date
+from flask import request
 
-from something import drawGantt
+#Other
+import re
+
+#Project
 from components import createGantt
-from something import getInOrderOfLastAvailabe
-from something import addStats
-
 from components import createDyePanel
 from components import createTable
 from components import createPersonalDyePanel
-
 from components import createPersonalKitPanel
 
-from api_calls import findOwnedDyes
-from api_calls import check_api_key
-
 from dataManager import neverInBlc
+from dataManager import access
 
+from something import getInOrderOfLastAvailabe
+from something import addStats
 from something import goldFromInteger
 
-from dataManager import access
+from api_calls import check_api_key
+
+#TODO: For deploy
+#import sys
+#print(sys.executable)
+
+#APP
+app = dash.Dash(external_stylesheets=[dbc.themes.BOOTSTRAP])
+#Some callback Inputs/Output components (ids) don't exist yet as they are created based on API key
+app.config['suppress_callback_exceptions'] = True
 
 #Data for gantt and tables
 inOrderDF = getInOrderOfLastAvailabe()
@@ -39,12 +47,6 @@ notInBlc = ""
 for x, y in neverInBlc():
     notInBlc = notInBlc + y + ", "
 notInBlc = notInBlc[:-2]
-
-#external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
-#app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
-app = dash.Dash(external_stylesheets=[dbc.themes.BOOTSTRAP])
-
-app.config['suppress_callback_exceptions'] = True
 
 def tab1content():
     content = html.Div([
@@ -63,27 +65,6 @@ def tab1content():
     return content
 
 def tab2content():
-    content = html.Div([
-        html.Center(html.H2("Kit&Dye Information")),
-        dbc.Container([
-            dbc.Row([
-                dbc.Col(
-                    id='kit-table',
-                    children=[
-                    createTable(representDF,'kitTable')]
-                ),
-                dbc.Col(id='dye-table',
-                        children=[dbc.Label("")],
-                        #width=4
-                    )
-                ]
-            )
-        ])
-    ])
-
-    return content
-
-def tab2content2():
     content = html.Div([
         html.Center(html.H2("Kit&Dye Information")),
         html.Div(
@@ -123,6 +104,8 @@ def tab2content2():
 def tab3content():
     content = html.Div([
         html.Center(html.H2("Portfolio")),
+
+        #API key text are and button
         dbc.Row([
             dbc.Col([],width=1),
             dbc.Col(
@@ -132,22 +115,26 @@ def tab3content():
             dbc.Col(
                 [dbc.Button("Enter API", id="apiButton")],
                 width=1
-            ),
+            )
         ]),
 
-        dbc.Card([
-            dbc.CardBody([
-                dbc.Col([],
-                    id="valid_api_div",
-                    style={'font-size': '16px'}),
+        #Meta card:
+        # Displays API key used (when valid entered), total sell value, total buy value
 
-                dbc.Col([],
-                    id="total-out",
-                    style={'font-size': '16px'})
+        dbc.Spinner([
+            dbc.Card([
+                dbc.CardBody([
+                    dbc.Col([],
+                            id="valid_api_div",
+                            style={'font-size': '16px'}),
+
+                    dbc.Col([],
+                            id="total-out",
+                            style={'font-size': '16px'})
                 ])
             ],
-            outline=True)
-        ,
+                outline=True),
+        ]),
 
         html.Br(),
         html.Div(
@@ -180,6 +167,7 @@ def tab3content():
                 )
             ]
         ),
+        #Invalid key toast
         dbc.Toast(
             "Check your key",
             id="invalid-toast",
@@ -188,31 +176,40 @@ def tab3content():
             is_open=False,
             dismissable=True,
             icon="danger",
-            # top: 66 positions the toast below the navbar
             style={"position": "fixed", "top": 66, "right": 10, "width": 350},
             duration=3000,
         )
     ])
 
-
     return content
 
-#Page layout
+#MAIN LAYOUT DEFINITON
+# Calls functions to make subcomponents
 app.layout = html.Div(
     #width=12,
     children=[
     html.H1(children='DYE DASH'),
     dbc.Tabs([
         dbc.Tab(tab1content(),label="AVAILABILITY CHART"),
-        dbc.Tab(tab2content2(),label="BASIC INFORMATION"),
+        dbc.Tab(tab2content(), label="BASIC INFORMATION"),
         dbc.Tab(tab3content(),label="PORTFOLIO")
     ]),
 
     html.Div([""],id='api-store',style={'display':'none'}),
 ])
 
-#OPEN PERSONAL KIT LIST
-#Saves api to hiden div (id:api-store)
+
+#@app.callback(
+#    Output("loading-output", "children"), [Input("apiButton", "n_clicks")]
+#)
+#def load_output(n):
+#    if n:
+#        #time.sleep(1)
+#        return f"Output loaded {n} times"
+#    return "Output not reloaded yet"
+
+#Creates a PERSONAL KIT panel when a valid API key is entered
+# Saves api to hiden div (id:api-store) for later use
 @app.callback([Output('personal-kits', 'children'),
                Output('api-store', 'children'),
                Output('personal-div', 'style'),
@@ -226,54 +223,51 @@ def personalKits(n_clicks, apiKey):
     if n_clicks is None:
         return [dash.no_update, dash.no_update,dash.no_update, dash.no_update, dash.no_update, False]
 
-    print("API BUTTON CLICKED")
-
     #Check api key validity
     isValid = check_api_key(apiKey)
     if not isValid:
-        print("Invalid api key")
+        print("[%s] Invalid api key"%request.remote_addr)
         return [dash.no_update, dash.no_update,dash.no_update, dash.no_update, dash.no_update, True]
 
+    #Access
     access(apiKey)
 
-    b = createPersonalKitPanel(apiKey)
+    print("[%s] Creating personal kit panel..."%request.remote_addr)
 
-    a = findOwnedDyes(apiKey)
-    totalSell = a['num'] * a['sell']
-    totalSell = sum(totalSell)
+    #Creating the dash component
+    panelComponent = createPersonalKitPanel(apiKey)
 
-    totalBuy = a['num'] * a['buy']
-    totalBuy = sum(totalBuy)
+    #Totaling the values of all kit, displayed on top
+    data = panelComponent.data
 
-    return [b,apiKey, {'display':'inline'}, ["Using: %s"%apiKey],
+    totalSell = 0
+    totalBuy = 0
+    for each in data:
+        totalSell += int(re.sub("[^0-9]", "",each['Sell value']))
+        totalBuy += int(re.sub("[^0-9]", "" ,each['Buy value']))
+
+    return [panelComponent,apiKey, {'display':'inline'}, ["Using: %s"%apiKey],
             ["Portfolio sell value: %s"%goldFromInteger(totalSell),html.Br(),"Portfolio buy value: %s"%goldFromInteger(totalBuy)], False]
 
-#OPEN PERSONAL DYE LIST
-# Input('personalKitTable', 'derived_virtual_data') - not needed, here just in case
+#Creates a PERSONAL DYE PANEL when row in kit table is selected
 @app.callback(
     Output('personal-dyes', 'children'),
     [Input('personalKitTable', 'derived_virtual_selected_rows'),
      Input('api-store', 'children')])
 def personalDyes(selected_row_indices, apiKey):
-    print("Api key: %s"%apiKey)
-    #print("Callback")
     if(selected_row_indices is None):
         return html.Div(html.P("Nothing selected"),id="bla")
     if(len(selected_row_indices) == 0):
         return html.Div(html.P("Nothing selected"),id="bla")
 
     row = selected_row_indices[0]
-    #print(inOrderDF.iloc[row])
-
     kitName = inOrderDF.iloc[row][1]
     kitID = inOrderDF.iloc[row][0]
 
-    dfOwned = findOwnedDyes(apiKey)
+    print("[%s] Opening personal panel..."%request.remote_addr)
+    return createPersonalDyePanel(kitID, apiKey)
 
-    print("Creating kit panel...")
-    return createPersonalDyePanel(kitID, dfOwned)
-
-#OPEN DYE LIST
+#Creates a BASIC DYE PANEL when a kit table row is selected
 @app.callback(
     Output('dye-table', 'children'),
     [Input('kitTable', 'derived_virtual_selected_rows')])
@@ -285,16 +279,10 @@ def dyes(selected_row_indices):
         return html.Div(html.P("Nothing selected"),id="bla")
 
     row = selected_row_indices[0]
-    #print(inOrderDF.iloc[row])
-
     kitName = inOrderDF.iloc[row][1]
     kitID = inOrderDF.iloc[row][0]
 
-    #print(row)
-    #print(row)
-    #print(kitID)
-
-    print("Creating dye panel...")
+    print("[%s] Creating dye panel..."%request.remote_addr)
     return createDyePanel(kitID)
 
 if __name__ == '__main__':

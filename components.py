@@ -146,9 +146,8 @@ def createDyePanel(id):
     return dbc.Table(elements, id="panel", style={'font-size':14})
 
 
-def createPersonalDyePanel(kitId, dfOwned):
-    print("Creating personal dye panel...")
-    dfOwned2 = dfOwned
+def createPersonalDyePanel(kitId, apiKey):
+    dfOwned2 = findOwnedDyes(apiKey)
 
     dfOwned2["sellMul"] = dfOwned2["sell"] * dfOwned2["num"]
     dfOwned2["buyMul"] = dfOwned2["buy"] * dfOwned2["num"]

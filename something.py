@@ -9,51 +9,7 @@ import pandas
 import datetime
 from datetime import date
 
-def drawGantt():
-    conn = sqlite3.connect('dyes.db')
-    cursor = conn.cursor()
-    currentDate = datetime.datetime.today().strftime('%Y-%m-%d')
-
-    cursor.execute("SELECT MAX (date_to) AS \"md\" FROM Blc")
-    a = cursor.fetchone()
-    currentKitStartDate = a[0]
-
-    cursor.execute("SELECT * FROM Kit")
-    a = cursor.fetchall()
-    #print(a)
-
-    df = []
-
-    for each in a:
-        #print(each)
-        id = each[0]
-        name = each[1]
-
-        cursor.execute("SELECT * FROM Blc WHERE id =%s"%id)
-        b = cursor.fetchall()
-        for every in b:
-            start = every[1]
-            end = every[2]
-
-            dic = dict(Task=name, Start=start, Finish=end, Resource=name)
-            df.append(dic)
-
-        cursor.execute("SELECT * FROM Curr WHERE id =%s"%id)
-        b = cursor.fetchall()
-
-        for every in b:
-            start = currentKitStartDate
-            end = currentDate
-            dic = dict(Task=name, Start=start, Finish=end, Resource=name)
-            #print(dic)
-            df.append(dic)
-
-    fig = px.timeline(df, x_start="Start", x_end="Finish", y="Resource", color="Resource")
-    fig.update_yaxes(autorange="reversed")
-    fig.update_layout(height = 700)
-
-    conn.close()
-    return fig
+#TODO: FUNCITONS IN THIS FILE NEED TO BE MOVED, ONLY TEMP HERE
 
 def goldFromInteger(a):
     #print(a)
@@ -66,8 +22,6 @@ def goldFromInteger(a):
 
     out = "%sg %ss %sc"%(gold,silver,copper)
     return out
-
-
 
 def drawPriceChart(id):
     buyDataFile = getBuyHistory(id)
@@ -84,20 +38,6 @@ def drawPriceChart(id):
     fig.update_xaxes(rangeslider_visible=True)
 
     return fig
-
-def test():
-    conn = sqlite3.connect('dyes.db')
-    cursor = conn.cursor()
-
-    cursor.execute("SELECT * FROM Kit")
-    a = cursor.fetchall()
-    #print(a)
-
-    cursor.execute("SELECT * FROM Blc WHERE id = 6")
-    a = cursor.fetchall()
-    #print(a)
-
-    conn.close()
 
 def getInOrderOfLastAvailabe():
     conn = sqlite3.connect('dyes.db')
@@ -184,7 +124,6 @@ def addStats(df):
 
     df.insert(3, "Days since", daySinceColumn, True)
     df.insert(4, "Last time away", lastTimeUnavailable, True)
-
 
     conn.close()
     return df
