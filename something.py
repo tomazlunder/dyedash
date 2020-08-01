@@ -23,22 +23,6 @@ def goldFromInteger(a):
     out = "%sg %ss %sc"%(gold,silver,copper)
     return out
 
-def drawPriceChart(id):
-    buyDataFile = getBuyHistory(id)
-    sellDataFile = getSellHistory(id)
-
-    buyJSON = json.loads(buyDataFile)
-    buyRes = buyJSON["results"]
-
-    sellJSON = json.loads(sellDataFile)
-    sellRes = sellJSON["results"]
-
-    #print(buyRes)
-    fig = px.line(buyRes, x='listing_datetime', y='unit_price')
-    fig.update_xaxes(rangeslider_visible=True)
-
-    return fig
-
 def getInOrderOfLastAvailabe():
     conn = sqlite3.connect('dyes.db')
     cursor = conn.cursor()
@@ -68,7 +52,7 @@ def getInOrderOfLastAvailabe():
     conn.close()
     return pandas.concat([df2,df])
 
-def addStats(df):
+def addKitTimeStats(df):
     conn = sqlite3.connect('dyes.db')
     cursor = conn.cursor()
 
@@ -118,9 +102,7 @@ def addStats(df):
             else:
                 lastTimeUnavailable.append(delta.days)
 
-        # Mean time unavailable
-
-    #print(lastTimeUnavailable)
+        #TODO: Mean time unavailable
 
     df.insert(3, "Days since", daySinceColumn, True)
     df.insert(4, "Last time away", lastTimeUnavailable, True)

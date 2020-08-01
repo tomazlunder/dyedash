@@ -72,15 +72,12 @@ def access(id):
 
     acc = cursor.fetchall()
 
-    print(acc)
-
     if(len(acc) == 0):
         cursor.execute("INSERT INTO Access VALUES (\'%s\', 1)"%id)
         conn.commit()
         return
     else:
         num = acc[0][1];
-        print(num);
         cursor.execute("UPDATE Access SET counter = \'%s\' WHERE id =\'%s\'"%(num+1,id))
         conn.commit()
         return

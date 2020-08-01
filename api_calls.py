@@ -2,7 +2,6 @@ import urllib.request
 import urllib.error
 import re
 import sqlite3
-import time
 import json
 import pandas as pd
 

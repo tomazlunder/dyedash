@@ -24,7 +24,7 @@ from dataManager import neverInBlc
 from dataManager import access
 
 from something import getInOrderOfLastAvailabe
-from something import addStats
+from something import addKitTimeStats
 from something import goldFromInteger
 
 from api_calls import check_api_key
@@ -40,7 +40,7 @@ app.config['suppress_callback_exceptions'] = True
 
 #Data for gantt and tables
 inOrderDF = getInOrderOfLastAvailabe()
-inOrderDF = addStats(inOrderDF)
+inOrderDF = addKitTimeStats(inOrderDF)
 representDF = inOrderDF.loc[:, inOrderDF.columns != 'id']
 
 notInBlc = ""
@@ -147,7 +147,6 @@ def tab3content():
                             id='personal-kits',
                             className= 'card-text',
                             children=[dbc.Label("")],
-                            # width=4
                         )],
                     style={"min-width": "870px"},
                     color="success",
@@ -157,7 +156,6 @@ def tab3content():
                         dbc.CardBody(
                             id='personal-dyes',
                             children=[dbc.Label("")],
-                            # width=4
                         )],
                         style={"min-width": "700px"},
                         color="success",
@@ -198,15 +196,7 @@ app.layout = html.Div(
     html.Div([""],id='api-store',style={'display':'none'}),
 ])
 
-
-#@app.callback(
-#    Output("loading-output", "children"), [Input("apiButton", "n_clicks")]
-#)
-#def load_output(n):
-#    if n:
-#        #time.sleep(1)
-#        return f"Output loaded {n} times"
-#    return "Output not reloaded yet"
+# *** CALLBACKS ***
 
 #Creates a PERSONAL KIT panel when a valid API key is entered
 # Saves api to hiden div (id:api-store) for later use
@@ -242,9 +232,14 @@ def personalKits(n_clicks, apiKey):
 
     totalSell = 0
     totalBuy = 0
-    for each in data:
-        totalSell += int(re.sub("[^0-9]", "",each['Sell value']))
-        totalBuy += int(re.sub("[^0-9]", "" ,each['Buy value']))
+    for kit in data:
+        sell = re.sub("[^0-9]", "",kit['Sell value'])
+        buy = re.sub("[^0-9]", "" ,kit['Buy value'])
+        if(sell != ""):
+            totalSell += int(sell)
+
+        if(buy != ""):
+            totalBuy += int(buy)
 
     return [panelComponent,apiKey, {'display':'inline'}, ["Using: %s"%apiKey],
             ["Portfolio sell value: %s"%goldFromInteger(totalSell),html.Br(),"Portfolio buy value: %s"%goldFromInteger(totalBuy)], False]
@@ -261,7 +256,6 @@ def personalDyes(selected_row_indices, apiKey):
         return html.Div(html.P("Nothing selected"),id="bla")
 
     row = selected_row_indices[0]
-    kitName = inOrderDF.iloc[row][1]
     kitID = inOrderDF.iloc[row][0]
 
     print("[%s] Opening personal panel..."%request.remote_addr)
@@ -272,14 +266,13 @@ def personalDyes(selected_row_indices, apiKey):
     Output('dye-table', 'children'),
     [Input('kitTable', 'derived_virtual_selected_rows')])
 def dyes(selected_row_indices):
-    #print("Callback")
+    #Avoids the first call
     if(selected_row_indices is None):
         return html.Div(html.P("Nothing selected"),id="bla")
     if(len(selected_row_indices) == 0):
         return html.Div(html.P("Nothing selected"),id="bla")
 
     row = selected_row_indices[0]
-    kitName = inOrderDF.iloc[row][1]
     kitID = inOrderDF.iloc[row][0]
 
     print("[%s] Creating dye panel..."%request.remote_addr)

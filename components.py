@@ -1,33 +1,25 @@
-import dash
-import dash_core_components as dcc
 import dash_html_components as html
 import dash_table
 import plotly.express as px
 import pandas as pd
-import importlib
 import sqlite3
 import dash_bootstrap_components as dbc
-import json
-import urllib.request
 import math
 import datetime
+import base64
 
 from pandas import DataFrame
 
-
 from something import goldFromInteger
-
-
 from something import getInOrderOfLastAvailabe
+from something import addKitTimeStats
+
 from dataManager import ganttData
 
 from api_calls import api_get_prices
 from api_calls import findOwnedDyes
 
-from something import addStats
-
-import base64
-
+#TODO: Figgure out how to insert images for currency
 image_gold = 'assets/img/coin_gold.png' # replace with your own image
 encoded_image_gold = base64.b64encode(open(image_gold, 'rb').read())
 
@@ -60,7 +52,7 @@ def createPersonalKitPanel(apiKey):
     dfOwned = findOwnedDyes(apiKey)
 
     data = getInOrderOfLastAvailabe()
-    data = addStats(data)
+    data = addKitTimeStats(data)
 
     #Getting numDyes, totalSell, totalBuy for every kit
     dfOwned["sellMul"] = dfOwned["sell"] * dfOwned["num"]
@@ -79,8 +71,8 @@ def createPersonalKitPanel(apiKey):
     #Merging with data
     mergedDf = pd.merge(data, groupedDf, on='id', how='outer')
 
-    mergedDf['sellGold'] = [goldFromInteger(int(x)) if not math.isnan(x) else goldFromInteger(0) for x in mergedDf['sell']]
-    mergedDf['buyGold'] = [goldFromInteger(int(x)) if not math.isnan(x) else goldFromInteger(0) for x in mergedDf['buy']]
+    mergedDf['sellGold'] = [goldFromInteger(int(x)) if not math.isnan(x) else "" for x in mergedDf['sell']]
+    mergedDf['buyGold'] = [goldFromInteger(int(x)) if not math.isnan(x) else "" for x in mergedDf['buy']]
 
     mergedDf = mergedDf[['name','maxDateTo','Days since', 'Last time away','num','sellGold','buyGold']]
 
@@ -147,12 +139,14 @@ def createDyePanel(id):
 
 
 def createPersonalDyePanel(kitId, apiKey):
-    dfOwned2 = findOwnedDyes(apiKey)
+    #Getting owned dyes
+    ownedDyesDf = findOwnedDyes(apiKey)
 
-    dfOwned2["sellMul"] = dfOwned2["sell"] * dfOwned2["num"]
-    dfOwned2["buyMul"] = dfOwned2["buy"] * dfOwned2["num"]
-    #print(dfOwned2)
+    #Calculation total stake in each dye
+    ownedDyesDf["sellMul"] = ownedDyesDf["sell"] * ownedDyesDf["num"]
+    ownedDyesDf["buyMul"] = ownedDyesDf["buy"] * ownedDyesDf["num"]
 
+    #Getting dye info from DB
     conn = sqlite3.connect('dyes.db')
     cursor = conn.cursor()
 
@@ -163,15 +157,14 @@ def createPersonalDyePanel(kitId, apiKey):
 
     dyesDf.columns = ['name', 'realId','color1','color2','color3']
 
+    #LEFT JOIN with owned dyes
+    b = pd.merge(dyesDf, ownedDyesDf, on='realId', how='left')
 
-    #print(dyesDf)
-
-    b = pd.merge(dyesDf, dfOwned2, on='realId', how='left')
-    #print(b)
-
+    #Getting prices of owned dyes
     idsList = b['realId'].tolist()
     priceJSON = api_get_prices(idsList)
 
+    #Creating the component
     elements = []
     elements.append(html.Tr([html.Th("Name"), html.Th("SPIDY"), html.Th("GW2TP"), html.Th("CC"),
                             html.Th("Sell/Buy"),html.Th("Owned"),html.Th("Total Sell/Buy")]))
@@ -195,26 +188,22 @@ def createPersonalDyePanel(kitId, apiKey):
         if(math.isnan(numOwned)):
             numOwned = 0
         if(math.isnan(sellPrice)):
-            sellPrice = 0
+            #The prices of owned dyes are already set, setting non owned dye prices
             sellPrice = priceJSON[i]['sells']['unit_price']
         if(math.isnan(buyPrice)):
-            buyPrice = 0
+            # The prices of owned dyes are already set, setting non owned dye prices
             buyPrice = priceJSON[i]['buys']['unit_price']
         if(math.isnan(totalSell)):
             totalSell = 0
         if(math.isnan(totalBuy)):
             totalBuy = 0
 
+        #Adding elements to ROW
         subElements.append(html.Td(html.Label(name)))
 
         subElements.append(html.Td(html.A("Spidy", href="https://www.gw2spidy.com/item/%s" % realId)))
         subElements.append(html.Td(html.A("GW2TP", href="https://www.gw2tp.com/item/%s" % realId)))
 
-        """
-        subElements.append(html.Td(html.P(html.Label(),
-                                          style={'background-color': "#%s" % color1, 'width': 22, 'height': 22,
-                                                 'border-width': 1, 'border-style': 'solid', 'border-color': 'black'})))
-        """
 
         subElements.append(html.Td(html.Span([html.Div([],
                                                     style={'background-color': "#%s" % color1, 'width': 22, 'height': 22,
@@ -233,8 +222,8 @@ def createPersonalDyePanel(kitId, apiKey):
 
         subElements.append(html.Td([html.Div(goldFromInteger(totalSell)),html.Br(),html.Div(goldFromInteger(totalBuy))]))
 
+        #Adding ROW to TABLE
         elements.append(html.Tr(subElements, style={'font-size': 13}))
         i+=1
 
     return dbc.Table(elements,id="personal-dye-panel")
-
